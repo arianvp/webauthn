@@ -765,13 +765,17 @@ deriving via PrettyHexByteString instance ToJSON PublicKeyBytes
 -- This is a dictionary containing the [client extension input](https://www.w3.org/TR/webauthn-2/#client-extension-input)
 -- values for zero or more [WebAuthn Extensions](https://www.w3.org/TR/webauthn-2/#webauthn-extensions).
 -- TODO: Most extensions are not implemented by this library, see "Crypto.WebAuthn.Model.Types#extensions".
-newtype AuthenticationExtensionsClientInputs = AuthenticationExtensionsClientInputs
+data AuthenticationExtensionsClientInputs = AuthenticationExtensionsClientInputs
   { -- | [(spec)](https://www.w3.org/TR/webauthn-2/#sctn-authenticator-credential-properties-extension)
     -- When true, indicates that that extension is requested by the [Relying Party](https://www.w3.org/TR/webauthn-2/#relying-party).
-    aeciCredProps :: Maybe Bool
+    aeciCredProps :: Maybe Bool,
+    -- | [(spec)](https://www.w3.org/TR/webauthn-2/#sctn-uvm-extension)
+    -- When true, indicates that that extension is requested by the [Relying Party](https://www.w3.org/TR/webauthn-2/#relying-party).
+    aeciUvm :: Maybe Bool
   }
-  deriving (Eq, Show)
-  deriving newtype (ToJSON)
+  deriving (Eq, Show, Generic)
+
+deriving instance ToJSON AuthenticationExtensionsClientInputs
 
 -- | [(spec)](https://www.w3.org/TR/webauthn-2/#dictdef-credentialpropertiesoutput)
 -- This is a dictionary containing the client properties output.

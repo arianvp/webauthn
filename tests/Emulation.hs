@@ -185,7 +185,7 @@ validAssertionResult AuthenticatorNone {..} _ (Right O.SignatureCounterPotential
 validAssertionResult AuthenticatorNone {..} uaConformance (Left errors) = all isValidated errors
   where
     isValidated :: O.AuthenticationError -> Bool
-    isValidated (O.AuthenticationCredentialDisallowed _ _) = False
+    isValidated (O.AuthenticationCredentialDisallowed {}) = False
     isValidated (O.AuthenticationIdentifiedUserHandleMismatch _ _) = False
     isValidated (O.AuthenticationCredentialUserHandleMismatch _ _) = False
     isValidated O.AuthenticationCannotVerifyUserHandle = False

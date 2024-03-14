@@ -236,7 +236,7 @@ instance Arbitrary M.AuthenticatorSelectionCriteria where
       <*> arbitrary
 
 instance Arbitrary M.AuthenticationExtensionsClientInputs where
-  arbitrary = M.AuthenticationExtensionsClientInputs <$> arbitrary
+  arbitrary = M.AuthenticationExtensionsClientInputs <$> arbitrary <*> arbitrary
 
 instance Arbitrary (M.CredentialOptions 'M.Registration) where
   arbitrary =

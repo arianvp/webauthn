@@ -19,6 +19,7 @@
 -- which is a high level overview of the registration procedure.
 module Crypto.WebAuthn.Operation.Registration
   ( verifyRegistrationResponse,
+    RegistrationState (..),
     RegistrationError (..),
     RegistrationResult (..),
     AuthenticatorModel (..),
@@ -43,8 +44,7 @@ import Crypto.WebAuthn.Operation.CredentialEntry
         ceCredentialId,
         cePublicKeyBytes,
         ceSignCounter,
-        ceTransports,
-        ceUserHandle
+        ceTransports
       ),
   )
 import Data.Aeson (ToJSON, Value (String), object, toJSON, (.=))
@@ -263,6 +263,12 @@ data RegistrationResult = RegistrationResult
 -- "Crypto.WebAuthn.Encoding" modules
 deriving instance ToJSON RegistrationResult
 
+data RegistrationState = RegistrationState
+  { rsUserVerificationPolicy :: M.UserVerificationRequirement,
+    rsChallenge :: M.Challenge,
+    rsCredentialAlgorithms :: [Cose.CoseSignAlg]
+  }
+
 -- | [(spec)](https://www.w3.org/TR/webauthn-2/#sctn-registering-a-new-credential)
 -- The resulting 'rrEntry' of this call should be stored in a database by the
 -- Relying Party. The 'rrAttestationStatement' contains the result of the
@@ -280,7 +286,7 @@ verifyRegistrationResponse ::
   -- statement certificate chain
   DateTime ->
   -- | The options passed to the create() method
-  M.CredentialOptions 'M.Registration ->
+  RegistrationState ->
   -- | The response from the authenticator
   M.Credential 'M.Registration 'True ->
   -- | Either a nonempty list of validation errors in case the attestation FailedReason
@@ -291,7 +297,7 @@ verifyRegistrationResponse
   rpIdHash
   registry
   currentTime
-  options@M.CredentialOptionsRegistration {..}
+  RegistrationState {..}
   credential@M.Credential
     { M.cResponse =
         M.AuthenticatorResponseRegistration
@@ -344,9 +350,9 @@ verifyRegistrationResponse
 
       -- 8. Verify that the value of C.challenge equals the base64url encoding of
       -- options.challenge.
-      unless (corChallenge == M.ccdChallenge c) $
+      unless (rsChallenge == M.ccdChallenge c) $
         failure $
-          RegistrationChallengeMismatch corChallenge (M.ccdChallenge c)
+          RegistrationChallengeMismatch rsChallenge (M.ccdChallenge c)
 
       -- 9. Verify that the value of C.origin matches the Relying Party's origin.
       unless (rpOrigin == M.ccdOrigin c) $
@@ -388,22 +394,21 @@ verifyRegistrationResponse
       -- NOTE: The spec is interpreted to mean that the userVerification option
       -- from authenticatorSelection being set to "required" is what is meant by
       -- whether user verification is required
-      case ( M.ascUserVerification <$> M.corAuthenticatorSelection options,
+      case ( rsUserVerificationPolicy,
              M.adfUserVerified (M.adFlags authData)
            ) of
-        (Nothing, _) -> pure ()
-        (Just M.UserVerificationRequirementRequired, True) -> pure ()
-        (Just M.UserVerificationRequirementRequired, False) -> failure RegistrationUserNotVerified
-        (Just M.UserVerificationRequirementPreferred, True) -> pure ()
-        (Just M.UserVerificationRequirementPreferred, False) -> pure ()
-        (Just M.UserVerificationRequirementDiscouraged, True) -> pure ()
-        (Just M.UserVerificationRequirementDiscouraged, False) -> pure ()
+        (M.UserVerificationRequirementRequired, True) -> pure ()
+        (M.UserVerificationRequirementRequired, False) -> failure RegistrationUserNotVerified
+        (M.UserVerificationRequirementPreferred, True) -> pure ()
+        (M.UserVerificationRequirementPreferred, False) -> pure ()
+        (M.UserVerificationRequirementDiscouraged, True) -> pure ()
+        (M.UserVerificationRequirementDiscouraged, False) -> pure ()
 
       -- 16. Verify that the "alg" parameter in the credential public key in
       -- authData matches the alg attribute of one of the items in
       -- options.pubKeyCredParams.
       let acdAlg = Cose.signAlg acdCredentialPublicKey
-          desiredAlgs = map M.cpAlg corPubKeyCredParams
+          desiredAlgs = rsCredentialAlgorithms
       unless (acdAlg `elem` desiredAlgs) $
         failure $
           RegistrationPublicKeyAlgorithmDisallowed desiredAlgs acdAlg
@@ -442,8 +447,7 @@ verifyRegistrationResponse
         RegistrationResult
           { rrEntry =
               CredentialEntry
-                { ceUserHandle = M.cueId $ M.corUser options,
-                  ceCredentialId = M.cIdentifier credential,
+                { ceCredentialId = M.cIdentifier credential,
                   cePublicKeyBytes = M.PublicKeyBytes $ M.unRaw acdCredentialPublicKeyBytes,
                   ceSignCounter = M.adSignCount authData,
                   ceTransports = M.arrTransports $ M.cResponse credential
